@@ -1,2 +1,3 @@
-# fyp-2025
-Final Year Project: Finite Element Solver for Light Scattering Simulation
+# Final Year Project
+
+Proposed title: _Finite element solver for light scattering simulation_
