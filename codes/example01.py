@@ -8,6 +8,10 @@ from dolfinx.mesh import create_rectangle, CellType
 from dolfinx import cpp
 from ufl import curl, grad, inner, dx
 
+# Physical parameters
+wl = 0.1
+k0 = 2 * np.pi / wl
+
 # Generate domain
 domain = create_rectangle(
     MPI.COMM_WORLD,
@@ -17,5 +21,19 @@ domain = create_rectangle(
 )
 
 # Define finite element function space
-V = functionspace(domain, ("N1curl", 1))
+V = functionspace(domain, ("N1curl", 3))
 
+# Interpolate incident field
+E_inc = Function(V)
+
+def incident(x):
+    return (x[0]*0, np.exp(-1j*k0*x[0]))
+
+E_inc.interpolate(incident)
+
+D = functionspace(domain, ("DG", 3, (2,)))
+E_inc_dg = Function(D)
+E_inc_dg.interpolate(E_inc)
+
+with VTXWriter(domain.comm, "E_inc.bp", E_inc_dg) as vtx:
+    vtx.write(0.0)
