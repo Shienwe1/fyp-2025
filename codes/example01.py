@@ -35,10 +35,10 @@ ds = Measure("ds", subdomain_data=mt_facet, domain=mesh)
 
 # Facet normal
 n = FacetNormal(mesh)
-n_3d = as_vector((n[0], n[1], 0))
 
 # Define finite element function space
-curl_el = element("N1curl", mesh.basix_cell(), 3, dtype=default_real_type)
+pdegree = 3
+curl_el = element("N1curl", mesh.basix_cell(), pdegree, dtype=default_real_type)
 V = functionspace(mesh, curl_el)
 E = TrialFunction(V)
 v = TestFunction(V)
@@ -95,7 +95,7 @@ solver.setOperators(A)
 Eh = Function(V)
 solver.solve(b, Eh.x.petsc_vec)
 
-D = functionspace(mesh, ("DG", 1, (2,)))
+D = functionspace(mesh, ("Lagrange", pdegree, (2,)))
 Eh_dg = Function(D)
 Eh_dg.interpolate(Eh)
 
