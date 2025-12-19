@@ -61,6 +61,19 @@ def incident(x):
 
 E_inc.interpolate(incident)
 
+def exact(x):
+    values = np.zeros((2, x.shape[1]), dtype=np.complex128)
+    kx = np.sqrt(k0**2 - np.pi**2)
+
+    values[0, :] = (
+        1/(1j*omega*eps) * np.pi * np.sin(np.pi*x[1]) * np.exp(-1j*kx*x[0])
+    )
+    values[1, :] = (
+        kx/(omega*eps) * np.cos(np.pi*x[1]) * np.exp(-1j*kx*x[0])
+    )
+
+    return values
+
 def cross_z(a, b):
     return a[0]*b[1]-a[1]*b[0]
 
@@ -95,9 +108,15 @@ solver.setOperators(A)
 Eh = Function(V)
 solver.solve(b, Eh.x.petsc_vec)
 
-D = functionspace(mesh, ("Lagrange", pdegree, (2,)))
+D = functionspace(mesh, ("DG", pdegree, (2,)))
 Eh_dg = Function(D)
 Eh_dg.interpolate(Eh)
 
 with VTXWriter(mesh.comm, "Eh.bp", Eh_dg) as vtx:
+    vtx.write(0.0)
+
+E_inc_dg = Function(D)
+E_inc_dg.interpolate(E_inc)
+
+with VTXWriter(mesh.comm, "E_inc.bp", E_inc_dg) as vtx:
     vtx.write(0.0)
