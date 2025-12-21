@@ -2,24 +2,30 @@ import numpy as np
 from mpi4py import MPI
 from petsc4py import PETSc
 
-from basix.ufl import element
-from dolfinx import default_real_type, default_scalar_type
-from dolfinx.fem import functionspace, Function, Constant, form, locate_dofs_topological, dirichletbc
+from dolfinx.fem import functionspace, Function, form, locate_dofs_topological, dirichletbc
 from dolfinx.io import XDMFFile, VTXWriter
-from dolfinx import cpp
 from dolfinx.fem.petsc import assemble_matrix, assemble_vector, apply_lifting
-from ufl import FacetNormal, TestFunction, TrialFunction, Measure, as_vector, curl, cross, inner, dx
+from ufl import FacetNormal, TestFunction, TrialFunction, Measure, as_vector, curl, inner, dx
+
+
+def cross_z(a, b):
+    return a[0]*b[1]-a[1]*b[0]
+
+
+def cross_xy(a, b):
+    return as_vector((a[1]*b, -a[0]*b))
+
 
 # MPI
 mpi_rank = MPI.COMM_WORLD.rank
 mpi_size = MPI.COMM_WORLD.size
 
 # Physical parameters
-wl = 0.1
-k0 = 2 * np.pi / wl
-mu = 1.0
-eps = 1.0
-omega = k0
+wl = 0.1  # wavelength
+k0 = 2 * np.pi / wl  # wave number
+mu = 1.0  # permeability
+eps = 1.0  # permittivity
+omega = k0  # angular frequency
 
 # Read mesh and tags
 with XDMFFile(MPI.COMM_WORLD, "mesh.xdmf", "r") as fmesh:
@@ -38,13 +44,12 @@ n = FacetNormal(mesh)
 
 # Define finite element function space
 pdegree = 3
-curl_el = element("N1curl", mesh.basix_cell(), pdegree, dtype=default_real_type)
-V = functionspace(mesh, curl_el)
+V = functionspace(mesh, ("N1curl", pdegree))
 E = TrialFunction(V)
 v = TestFunction(V)
 
 # Boundary dofs
-pecdofs = locate_dofs_topological(V, 1, mt_facet.find(3))
+pecdofs = locate_dofs_topological(V, tdim-1, mt_facet.find(3))
 
 # Dirichlet BC
 E_pec = Function(V)
@@ -60,26 +65,6 @@ def incident(x):
     return (I_x, I_y)
 
 E_inc.interpolate(incident)
-
-def exact(x):
-    values = np.zeros((2, x.shape[1]), dtype=np.complex128)
-    kx = np.sqrt(k0**2 - np.pi**2)
-
-    values[0, :] = (
-        1/(1j*omega*eps) * np.pi * np.sin(np.pi*x[1]) * np.exp(-1j*kx*x[0])
-    )
-    values[1, :] = (
-        kx/(omega*eps) * np.cos(np.pi*x[1]) * np.exp(-1j*kx*x[0])
-    )
-
-    return values
-
-def cross_z(a, b):
-    return a[0]*b[1]-a[1]*b[0]
-
-def cross_xy(a, b):
-    return as_vector((a[1]*b, -a[0]*b))
-
 b_inc = cross_xy(n, curl(E_inc)) - 1.0j * k0 * cross_xy(n, cross_z(n, E_inc))
 
 # Define forms
