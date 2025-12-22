@@ -2,11 +2,10 @@ import numpy as np
 from mpi4py import MPI
 from petsc4py import PETSc
 
-from dolfinx.fem import functionspace, Constant, Function, form, locate_dofs_topological, dirichletbc
+from dolfinx.fem import functionspace, Constant, Function, form
 from dolfinx.io import XDMFFile, VTXWriter
-from dolfinx.fem.petsc import assemble_matrix, assemble_vector, apply_lifting
+from dolfinx.fem.petsc import assemble_matrix, assemble_vector
 from ufl import FacetNormal, TestFunction, TrialFunction, Measure, as_vector, curl, inner, dx, ds
-
 
 
 def cross_z(a, b):
@@ -54,27 +53,27 @@ E = TrialFunction(V)
 v = TestFunction(V)
 
 # Interpolate incident field
-E_inc = Function(V)
-
 def incident(x):
     I_x = np.full(x.shape[1], 0.0)
     I_y = np.exp(-1j*k0*x[0])
     return (I_x, I_y)
 
+
+E_inc = Function(V)
 E_inc.interpolate(incident)
 
 # Define forms
 a = form(
     1/mu_val * inner(curl(E), curl(v)) * dx
     - omega_val**2 * eps_val * inner(E, v) * dx
-    + inner(1j*k0/mu_val * cross_xy(n, cross_z(n, E)), v) * ds(1)
+    - 1/mu_val * inner(1j*k0 * cross_xy(n, cross_z(n, E)), v) * ds(1)
 )
 A = assemble_matrix(a)
 A.assemble()
 
 L = form(
-    - inner(1/mu_val * curl(curl(E_inc)), v) * dx
-    + omega_val**2*eps_val*inner(E_inc, v) * dx
+    - inner(cross_xy(n, curl(E_inc)), v) * ds(1)
+    - 1/mu_val * inner(1j*k0 * cross_xy(n, cross_z(n, E_inc)), v) * ds(1)
 )
 b = assemble_vector(L)
 b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
@@ -85,15 +84,12 @@ solver.setType(PETSc.KSP.Type.PREONLY)
 solver.getPC().setType(PETSc.PC.Type.LU)
 solver.setOperators(A)
 
-Eh = Function(V)
-solver.solve(b, Eh.x.petsc_vec)
-
 Et = Function(V)
-Et.x.petsc_vec[:] = E_inc.x.petsc_vec[:] + Eh.x.petsc_vec[:]
+solver.solve(b, Et.x.petsc_vec)
 
 D = functionspace(mesh, ("DG", pdegree, (2,)))
 Et_dg = Function(D)
 Et_dg.interpolate(Et)
 
-with VTXWriter(mesh.comm, "Eh.bp", Et_dg) as vtx:
+with VTXWriter(mesh.comm, "Et.bp", Et_dg) as vtx:
     vtx.write(0.0)
