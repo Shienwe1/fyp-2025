@@ -2,9 +2,9 @@ import numpy as np
 from mpi4py import MPI
 from petsc4py import PETSc
 
-from dolfinx.fem import functionspace, Constant, Function, form, locate_dofs_topological, dirichletbc
+from dolfinx.fem import functionspace, Constant, Function, form
 from dolfinx.io import XDMFFile, VTXWriter
-from dolfinx.fem.petsc import assemble_matrix, assemble_vector, apply_lifting
+from dolfinx.fem.petsc import assemble_matrix, assemble_vector
 from ufl import FacetNormal, TestFunction, TrialFunction, Measure, as_vector, curl, inner, dx, ds
 
 
